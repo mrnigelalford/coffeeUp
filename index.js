@@ -134,12 +134,10 @@ exports.coffeeHTTP = (req, res) => {
 };
 
 exports.coffeeEvents = (req, res) => {
-  let response_text;
   // always respond with a 200 when recieved.
-  // process results in a seperate function and send a new call back when needed
   var payload = req.body;
   if (payload.challenge) {
-    return res
+    res
       .status(200)
       .type('json')
       .send({
@@ -150,27 +148,28 @@ exports.coffeeEvents = (req, res) => {
   // send body to factory for processing
   res.sendStatus(200);
 
+  // improve this protection
   if (payload.event.type !== 'message' && !payload.event.text) {
     return false;
   }
-
+  const text = payload.event.text;
   const channel = req.body.event.channel;
   const teamId = payload.team_id;
 
-  if (payload.event.text.match(/(sup)/gi)) {
+  if (text && text.match(/(sup)/gi)) {
     postMessage({ text: helper.greeting.whatsUp(), channel: channel });
   }
 
-  if (payload.event.text.match(/(add coffee: )/gi)) {
-    addCoffee(payload.event.text, teamId).then(coffee =>
+  if (text && text.match(/(add coffee: )/gi)) {
+    addCoffee(text, teamId).then(coffee =>
       postMessage({
-        text: 'congrats *' + coffee.name + '* was saved, happy snacking!',
+        text: 'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
         channel: channel,
       })
     );
   }
 
-  if (payload.event.text.match(/(menu)/g)) {
+  if (text && text.match(/(menu)/g)) {
     postMessage({
       text:
         'searching while drinking coffee, nothing to see here or worry about...',
@@ -182,8 +181,8 @@ exports.coffeeEvents = (req, res) => {
       if (coffee) {
         return postMessage({
           channel: channel,
-          attachments: helper.setSlackResponse(coffee),
-          text: "I am a test message http://slack.com",
+          text: "Here's what I found",
+          attachments: JSON.stringify(helper.setSlackResponse(coffee))
         });
       } else {
         return postMessage({
