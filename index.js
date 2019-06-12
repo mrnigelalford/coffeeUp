@@ -128,14 +128,14 @@ exports.coffeeEvents = (req, res) => {
 
   if (text && text.match(/(add coffee: )/gi)) {
     helper.addCoffee(text, teamId).then((coffee) =>
-      helper.helper.postMessage({
+      helper.postMessage({
         channel,
         text: 'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
       })
     );
   }
 
-  if (text && text.match(/(menu)/g)) {
+  if (text && text.match(/(menu)/gi)) {
     helper.postMessage({
       channel,
       text:
@@ -148,7 +148,6 @@ exports.coffeeEvents = (req, res) => {
       .collection('coffee')
       .get()
       .then((coffee) => {
-        count = 0;
         coffee = coffee.docs.map((result) => result.data());
         if (coffee.length > 0) {
           const attachments = JSON.stringify(helper.setSlackResponse(coffee));
