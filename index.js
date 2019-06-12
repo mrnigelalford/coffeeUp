@@ -1,6 +1,5 @@
 require('dotenv').config();
 const Firestore = require('@google-cloud/firestore');
-const db = require('./lib/db');
 const helper = require('./lib/helpers');
 const firestore = new Firestore();
 
@@ -82,6 +81,21 @@ exports.coffeeHTTP = (req, res) => {
                 text: err,
               })
             );
+        case 'delete':
+          return firestoreRef
+            .delete()
+            .then(() =>
+              helper.replaceMessage({
+                response_url,
+                text: 'that coffee is out of here!',
+              })
+            )
+            .catch((err) =>
+              helper.replaceMessage({
+                response_url,
+                text: err,
+              })
+            );
       }
   }
 };
@@ -109,40 +123,72 @@ exports.coffeeEvents = (req, res) => {
   const teamId = payload.team_id;
 
   if (text && text.match(/(sup)/gi)) {
-    helper.postMessage({ text: helper.greeting.whatsUp(), channel: channel });
+    helper.postMessage({ text: helper.greeting.whatsUp(), channel });
   }
 
   if (text && text.match(/(add coffee: )/gi)) {
     helper.addCoffee(text, teamId).then((coffee) =>
       helper.helper.postMessage({
+        channel,
         text: 'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
-        channel: channel,
       })
     );
   }
 
   if (text && text.match(/(menu)/g)) {
     helper.postMessage({
+      channel,
       text:
         'searching while drinking coffee, nothing to see here or worry about...',
-      channel: channel,
     });
 
-    db.getTodaysBrewedCoffee(teamId).then((coffee) => {
-      count = 0;
-      if (coffee.length > 0) {
-        const attachments = helper.setSlackResponse(coffee);
-        helper.postMessage({
-          channel: channel,
-          text: "Here's what I found",
-          attachments: JSON.stringify(attachments),
-        });
-      } else {
-        helper.postMessage({
-          text: 'no coffee found, brew up and try again',
-          channel: channel,
-        });
-      }
-    });
+    firestore
+      .collection('teams')
+      .doc(teamId)
+      .collection('coffee')
+      .get()
+      .then((coffee) => {
+        count = 0;
+        coffee = coffee.docs.map((result) => result.data());
+        if (coffee.length > 0) {
+          const attachments = JSON.stringify(helper.setSlackResponse(coffee));
+          helper.postMessage({
+            channel,
+            attachments,
+            text: "Here's what I found",
+          });
+        } else {
+          helper.postMessage({
+            channel,
+            text: 'no coffee found, brew up and try again',
+          });
+        }
+      });
   }
+};
+
+exports.oauth = (req, res) => {
+  if (!Object.keys(req.body).length) {
+    return res
+      .status(500)
+      .send('please send a proper slack call and try again');
+  }
+
+  helper.requestAuth(
+    {
+      code: req.query.code,
+      redirect_uri: req.body.redirect_uri,
+    },
+    (result) => {
+      if (result.status) {
+        res.status(200).send(result.msg);
+      } else {
+        res.status(500).send(result.msg);
+      }
+    }
+  );
+};
+
+exports.auth = (req, res) => {
+  res.sendFile(__dirname + '/add_to_slack.html');
 };
