@@ -23,8 +23,10 @@ exports.coffeeHTTP = (req, res) => {
       var id = data.actions[0].value;
       var actionName = data.actions[0].name;
       var teamId = data.team.id;
-      var channel = data.channel.id;
       var response_url = data.response_url;
+      var color =
+        data.original_message.attachments[Number(data.attachment_id) - 1].color;
+      var text = '';
 
       const firestoreRef = firestore
         .collection('teams')
@@ -67,12 +69,20 @@ exports.coffeeHTTP = (req, res) => {
               })
             );
         case 'brew':
+          if (color) {
+            color = '';
+            text = 'another one bites the dust :cry:';
+          } else {
+            color = '#32CD32';
+            text = 'excellent, I love when more coffee is brewed :coffee:';
+          }
+
           return firestoreRef
-            .update({ brew_date: Date.now() })
+            .update({ brew_date: Date.now(), color })
             .then(() =>
               helper.replaceMessage({
                 response_url,
-                text: 'excellent, I love when more coffee is brewed',
+                text,
               })
             )
             .catch((err) =>
