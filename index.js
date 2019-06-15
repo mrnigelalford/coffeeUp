@@ -74,7 +74,7 @@ exports.coffeeHTTP = (req, res) => {
         case 'brew':
           if (color) {
             color = '';
-            text = 'another one bites the dust :cry:';
+            text = 'mmmm....Good to the last drop :smile:';
           } else {
             color = '#32CD32';
             text = 'excellent, I love when more coffee is brewed :coffee:';
@@ -128,59 +128,61 @@ exports.coffeeEvents = (req, res) => {
   res.status(200).send('');
 
   // improve this protection
-  if (
-    payload &&
-    payload.event &&
-    payload.event.type !== 'message' &&
-    !payload.event.text
-  ) {
-    return false;
-  }
-  const text = payload.event.text;
-  const channel = payload.event.channel;
-  const teamId = payload.team_id;
+  if (payload.event && payload.event.type === 'message') {
+    const text = payload.event.text;
+    const channel = payload.event.channel;
+    const teamId = payload.team_id;
 
-  if (text && text.match(/(sup)/gi)) {
-    helper.postMessage({ text: helper.greeting.whatsUp(), channel });
-  }
+    if (text && text.match(/(sup)/gi)) {
+      helper.postMessage({ text: helper.greeting.whatsUp(), channel });
+    }
 
-  if (text && text.match(/(add coffee: )/gi)) {
-    helper.addCoffee(text, teamId).then((coffee) =>
-      helper.postMessage({
-        channel,
-        text: 'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
-      })
-    );
-  }
+    if (text && text.match(/(add coffee: )/gi)) {
+      helper.addCoffee(text, teamId).then((coffee) =>
+        helper.postMessage({
+          channel,
+          text:
+            'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
+        })
+      );
+    }
 
-  if (text && text.match(/(menu)/gi)) {
-    helper.postMessage({
-      channel,
-      text:
-        'searching while drinking coffee, nothing to see here or worry about...',
-    });
+    if (text && text.match(/(menu)/gi)) {
+      const currentMenu = helper.currentMenu();
+      if (currentMenu.length) {
+        helper.postMessage({
+          channel,
+          attachments: currentMenu,
+          text: "Here's what I found",
+        });
+      }
 
-    firestore
-      .collection('teams')
-      .doc(teamId)
-      .collection('coffee')
-      .get()
-      .then((coffee) => {
-        coffee = coffee.docs.map((result) => result.data());
-        if (coffee.length > 0) {
-          const attachments = JSON.stringify(helper.setSlackResponse(coffee));
-          helper.postMessage({
-            channel,
-            attachments,
-            text: "Here's what I found",
-          });
-        } else {
-          helper.postMessage({
-            channel,
-            text: 'no coffee found, brew up and try again',
-          });
-        }
-      });
+      firestore
+        .collection('teams')
+        .doc(teamId)
+        .collection('coffee')
+        .get()
+        .then((coffee) => {
+          coffee = coffee.docs.map((result) => result.data());
+          if (coffee.length > 0) {
+            const attachments = JSON.stringify(helper.setSlackResponse(coffee));
+            if (attachments !== currentMenu) {
+              helper.currentMenu(attachments);
+              helper.deleteMsg();
+              helper.postMessage({
+                channel,
+                attachments,
+                text: "Here's what I found",
+              });
+            }
+          } else {
+            helper.postMessage({
+              channel,
+              text: 'no coffee found, brew up and try again',
+            });
+          }
+        });
+    }
   }
 };
 
