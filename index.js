@@ -1,7 +1,10 @@
 require('dotenv').config();
 const Firestore = require('@google-cloud/firestore');
 const helper = require('./lib/helpers');
-const firestore = new Firestore();
+const firestore = new Firestore({
+  projectId: 'pantry-api-240403',
+  keyFilename: helper.getDBKey(),
+});
 
 /**
  * HTTP Cloud Function.
@@ -125,7 +128,12 @@ exports.coffeeEvents = (req, res) => {
   res.status(200).send('');
 
   // improve this protection
-  if (payload.event.type !== 'message' && !payload.event.text) {
+  if (
+    payload &&
+    payload.event &&
+    payload.event.type !== 'message' &&
+    !payload.event.text
+  ) {
     return false;
   }
   const text = payload.event.text;
