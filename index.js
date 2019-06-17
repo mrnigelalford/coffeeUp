@@ -1,6 +1,8 @@
 require('dotenv').config();
 const Firestore = require('@google-cloud/firestore');
+
 const helper = require('./lib/helpers');
+
 const firestore = new Firestore({
   projectId: 'pantry-api-240403',
   keyFilename: helper.getDBKey(),
@@ -187,20 +189,20 @@ exports.coffeeEvents = (req, res) => {
 };
 
 exports.oauth = (req, res) => {
-  if (!Object.keys(req.body).length) {
-    return res
-      .status(500)
-      .send('please send a proper slack call and try again');
+  if (!req.subdomains.length) {
+    return res.redirect('http://coffeeup.co');
   }
 
   helper.requestAuth(
     {
       code: req.query.code,
-      redirect_uri: req.body.redirect_uri,
+      redirect_uri: process.env.REDIRECT_URI,
     },
     (result) => {
       if (result.status) {
-        res.status(200).send(result.msg);
+        res
+          .status(200)
+          .send('congrats You are now able to coffeeUp your workspace!');
       } else {
         res.status(500).send(result.msg);
       }
