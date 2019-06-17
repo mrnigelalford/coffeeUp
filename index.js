@@ -136,13 +136,14 @@ exports.coffeeEvents = (req, res) => {
     const teamId = payload.team_id;
 
     if (text && text.match(/(sup)/gi)) {
-      helper.postMessage({ text: helper.greeting.whatsUp(), channel });
+      helper.postMessage({ text: helper.greeting.whatsUp(), channel, teamId });
     }
 
     if (text && text.match(/(add coffee: )/gi)) {
       helper.addCoffee(text, teamId).then((coffee) =>
         helper.postMessage({
           channel,
+          teamId,
           text:
             'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
         })
@@ -154,6 +155,7 @@ exports.coffeeEvents = (req, res) => {
       if (currentMenu.length) {
         helper.postMessage({
           channel,
+          teamId,
           attachments: currentMenu,
           text: "Here's what I found",
         });
@@ -174,6 +176,7 @@ exports.coffeeEvents = (req, res) => {
               helper.postMessage({
                 channel,
                 attachments,
+                teamId,
                 text: "Here's what I found",
               });
             }
@@ -181,6 +184,7 @@ exports.coffeeEvents = (req, res) => {
             helper.postMessage({
               channel,
               text: 'no coffee found, brew up and try again',
+              teamId,
             });
           }
         });
@@ -202,7 +206,9 @@ exports.oauth = (req, res) => {
       if (result.status) {
         res
           .status(200)
-          .send('congrats You are now able to coffeeUp your workspace!');
+          .send(
+            'congratulations! You are now able to coffeeUp your workspace!'
+          );
       } else {
         res.status(500).send(result.msg);
       }
