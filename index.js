@@ -1,5 +1,8 @@
 require('dotenv').config();
+require('@google-cloud/debug-agent').start();
+
 const Firestore = require('@google-cloud/firestore');
+const bodyParser = require('body-parser');
 
 const helper = require('./lib/helpers');
 
@@ -7,6 +10,10 @@ const firestore = new Firestore({
   projectId: 'pantry-api-240403',
   keyFilename: helper.getDBKey(),
 });
+
+const express = require('express');
+const app = express();
+
 
 /**
  * HTTP Cloud Function.
@@ -17,13 +24,18 @@ const firestore = new Firestore({
  *                     More info: https://expressjs.com/en/api.html#res
  */
 
-exports.coffeeHTTP = (req, res) => {
+coffeeHTTP = (req, res) => {
   switch (req.method) {
     case 'DELETE':
       throw 'not yet built';
     case 'POST':
       // store/insert a new document
-      var data = JSON.parse(req.body.payload);
+      if (!req.body.payload)
+        return res
+          .status(400)
+          .send('please send a body payload or reformat your call');
+
+      var data = req.body.payload;
       var increment = Firestore.FieldValue.increment(1);
       var id = data.actions[0].value;
       var actionName = data.actions[0].name;
@@ -54,7 +66,7 @@ exports.coffeeHTTP = (req, res) => {
             .catch((err) =>
               helper.replaceMessage({
                 response_url,
-                text: err,
+                text: err.message,
               })
             );
         case 'dislike':
@@ -115,7 +127,7 @@ exports.coffeeHTTP = (req, res) => {
   }
 };
 
-exports.coffeeEvents = (req, res) => {
+coffeeEvents = (req, res) => {
   // always respond with a 200 when recieved.
   var payload = req.body;
   if (payload.challenge) {
@@ -192,7 +204,7 @@ exports.coffeeEvents = (req, res) => {
   }
 };
 
-exports.oauth = (req, res) => {
+oauth = (req, res) => {
   if (!req.subdomains.length) {
     return res.redirect('http://coffeeup.co');
   }
@@ -216,6 +228,29 @@ exports.oauth = (req, res) => {
   );
 };
 
-exports.auth = (req, res) => {
+auth = (req, res) => {
   res.sendFile(__dirname + '/add_to_slack.html');
 };
+
+app.use(bodyParser.json({ type: 'application/json' }));
+
+app.post('/coffeeEvents', (req, res) => {
+  return coffeeEvents(req, res);
+});
+
+app.post('/coffeeHttp', (req, res) => {
+  console.log('heard http');
+  return coffeeHTTP(req, res);
+});
+
+app.post('/oauth', (req, res) => {
+  return oauth(req, res);
+});
+
+app.post('/auth', (req, res) => {
+  return auth(req, res);
+});
+
+app.listen(8080, () => {
+  console.log('loading');
+});
