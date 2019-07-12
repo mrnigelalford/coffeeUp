@@ -14,7 +14,6 @@ const firestore = new Firestore({
 const express = require('express');
 const app = express();
 
-
 /**
  * HTTP Cloud Function.
  *
@@ -30,19 +29,23 @@ coffeeHTTP = (req, res) => {
       throw 'not yet built';
     case 'POST':
       // store/insert a new document
-      if (!req.body.payload)
+
+      var body = req.body.payload;
+
+      if (!body)
         return res
           .status(400)
           .send('please send a body payload or reformat your call');
 
-      var data = req.body.payload;
+      body = JSON.parse(body);
+
       var increment = Firestore.FieldValue.increment(1);
-      var id = data.actions[0].value;
-      var actionName = data.actions[0].name;
-      var teamId = data.team.id;
-      var response_url = data.response_url;
+      var id = body.actions[0].value;
+      var actionName = body.actions[0].name;
+      var teamId = body.team.id;
+      var response_url = body.response_url;
       var color =
-        data.original_message.attachments[Number(data.attachment_id) - 1].color;
+        body.original_message.attachments[Number(body.attachment_id) - 1].color;
       var text = '';
 
       const firestoreRef = firestore
@@ -129,77 +132,69 @@ coffeeHTTP = (req, res) => {
 
 coffeeEvents = (req, res) => {
   // always respond with a 200 when recieved.
-  var payload = req.body;
-  if (payload.challenge) {
+  var body = req.body;
+  if (body.challenge) {
     res
       .status(200)
       .type('json')
       .send({
-        challenge: payload.challenge,
+        challenge: body.challenge,
       });
-  }
+  } else {
+    res.status(200).send('');
 
-  res.status(200).send('');
+    // improve this protection
+    if (body.event && body.event.type === 'message') {
+      const text = body.event.text;
+      const channel = body.event.channel;
+      const teamId = body.team_id;
 
-  // improve this protection
-  if (payload.event && payload.event.type === 'message') {
-    const text = payload.event.text;
-    const channel = payload.event.channel;
-    const teamId = payload.team_id;
-
-    if (text && text.match(/(sup)/gi)) {
-      helper.postMessage({ text: helper.greeting.whatsUp(), channel, teamId });
-    }
-
-    if (text && text.match(/(add coffee: )/gi)) {
-      helper.addCoffee(text, teamId).then((coffee) =>
+      if (text && text.match(/(sup)/gi)) {
         helper.postMessage({
+          text: helper.greeting.whatsUp(),
           channel,
           teamId,
-          text:
-            'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
-        })
-      );
-    }
-
-    if (text && text.match(/(menu)/gi)) {
-      const currentMenu = helper.currentMenu();
-      if (currentMenu.length) {
-        helper.postMessage({
-          channel,
-          teamId,
-          attachments: currentMenu,
-          text: "Here's what I found",
         });
       }
 
-      firestore
-        .collection('teams')
-        .doc(teamId)
-        .collection('coffee')
-        .get()
-        .then((coffee) => {
-          coffee = coffee.docs.map((result) => result.data());
-          if (coffee.length > 0) {
-            const attachments = JSON.stringify(helper.setSlackResponse(coffee));
-            if (attachments !== currentMenu) {
-              helper.currentMenu(attachments);
-              helper.deleteMsg();
+      if (text && text.match(/(add coffee: )/gi)) {
+        helper.addCoffee(text, teamId).then((coffee) =>
+          helper.postMessage({
+            channel,
+            teamId,
+            text:
+              'congrats *' + coffee.name + '* was saved, lets pour a cup now!',
+          })
+        );
+      }
+
+      if (text && text.match(/(menu)/gi)) {
+        firestore
+          .collection('teams')
+          .doc(teamId)
+          .collection('coffee')
+          .get()
+          .then((coffee) => {
+            coffee = coffee.docs.map((result) => result.data());
+            if (coffee.length > 0) {
+              const attachments = JSON.stringify(
+                helper.setSlackResponse(coffee)
+              );
               helper.postMessage({
                 channel,
                 attachments,
                 teamId,
                 text: "Here's what I found",
               });
+            } else {
+              helper.postMessage({
+                channel,
+                text: 'no coffee found, brew up and try again',
+                teamId,
+              });
             }
-          } else {
-            helper.postMessage({
-              channel,
-              text: 'no coffee found, brew up and try again',
-              teamId,
-            });
-          }
-        });
+          });
+      }
     }
   }
 };
@@ -232,25 +227,15 @@ auth = (req, res) => {
   res.sendFile(__dirname + '/add_to_slack.html');
 };
 
-app.use(bodyParser.json({ type: 'application/json' }));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-app.post('/coffeeEvents', (req, res) => {
-  return coffeeEvents(req, res);
-});
+app.post('/events', (req, res) => coffeeEvents(req, res));
 
-app.post('/coffeeHttp', (req, res) => {
-  console.log('heard http');
-  return coffeeHTTP(req, res);
-});
+app.post('/http', (req, res) => coffeeHTTP(req, res));
 
-app.post('/oauth', (req, res) => {
-  return oauth(req, res);
-});
+app.post('/oauth', (req, res) => oauth(req, res));
 
-app.post('/auth', (req, res) => {
-  return auth(req, res);
-});
+app.post('/auth', (req, res) => auth(req, res));
 
-app.listen(8080, () => {
-  console.log('loading');
-});
+app.listen(8080, () => console.log('coffee has been brewed'));
